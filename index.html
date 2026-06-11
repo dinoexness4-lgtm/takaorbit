@@ -664,15 +664,25 @@ function postCard(p) {
 function galleryCard(g) {
   const badge = g.type === "Flyer" ? "bg-secondary text-navy" : "bg-primary text-white";
   const ic = g.type === "Flyer" ? "campaign" : "photo_camera";
+  const s = getSettings();
+  const waHref = `https://wa.me/${waLink(s.waNumber)}?text=${encodeURIComponent("Halo Taka Orbit, saya tertarik dengan informasi di galeri: " + g.caption)}`;
+  /* Flyer: fit contain (no crop); Kegiatan: cover */
+  const imgFit = g.type === "Flyer" ? "object-contain bg-white" : "object-cover group-hover:scale-105 transition duration-300";
   return `
   <div class="group relative rounded-lg overflow-hidden border border-outline-variant bg-white ${g.image?'cursor-pointer':''}" ${g.image?`data-lb="${g.image}" data-cap="${esc(g.caption)}"`:''}>
     ${isAuthed()?`<button data-gedit="${g.id}" title="Kelola galeri" class="absolute top-2 right-2 z-20 inline-flex items-center justify-center w-9 h-9 rounded-full bg-navy-deep/90 text-white hover:bg-primary transition">${icon('edit','text-[18px]')}</button>`:''}
     <div class="relative aspect-[4/3] ${g.image?'':'ph-img'}">
-      ${g.image ? `<img src="${g.image}" loading="lazy" alt="${esc(g.caption)}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-300"/>`
+      ${g.image ? `<img src="${g.image}" loading="lazy" alt="${esc(g.caption)}" class="absolute inset-0 w-full h-full ${imgFit}"/>`
                 : `<div class="absolute inset-0 flex items-center justify-center text-white/50">${icon(ic,'text-[40px]')}</div>`}
       <span class="absolute top-2 left-2 z-10 ${badge} text-[10px] font-bold label-up px-2 py-1 rounded">${esc(g.type)}</span>
     </div>
-    <div class="p-3"><p class="text-sm font-semibold text-navy leading-snug">${esc(g.caption)}</p></div>
+    <div class="p-3 flex items-start justify-between gap-2">
+      <p class="text-sm font-semibold text-navy leading-snug flex-1">${esc(g.caption)}</p>
+      <a href="${waHref}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Tanya via WhatsApp"
+         class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#25D366] text-white hover:brightness-95 transition">
+        ${waGlyph()}
+      </a>
+    </div>
   </div>`;
 }
 
@@ -1824,7 +1834,7 @@ function bindGalleryAdmin() {
   let pending = "";
   $("#g-file").onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return;
-    try { pending = await fileToData(f,1280,0.72); $("#g-prev").innerHTML = `<img src="${pending}" class="w-full h-full object-cover" alt="">`; $("#g-prev").className = "aspect-[4/3] rounded overflow-hidden"; }
+    try { pending = await fileToData(f,1280,0.72); $("#g-prev").innerHTML = `<img src="${pending}" class="w-full h-full object-contain" alt="">`; $("#g-prev").className = "aspect-[4/3] rounded bg-white overflow-hidden border border-outline-variant"; }
     catch { alert("Gagal memproses gambar."); }
   };
   $("#g-upload").onclick = () => {
