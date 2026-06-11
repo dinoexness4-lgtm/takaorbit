@@ -164,8 +164,7 @@ const DEFAULT_SETTINGS = {
   aboutText: "PT Taka Orbit Cemerlang adalah lembaga pelatihan dan sertifikasi yang berfokus pada bidang Keselamatan dan Kesehatan Kerja (K3) serta kompetensi konstruksi. Kami berkomitmen mencetak tenaga kerja yang kompeten, berkeselamatan, dan bersertifikat resmi negara.",
   visi: "Menjadi pusat pelatihan K3 dan konstruksi terdepan dan terpercaya di Indonesia.",
   misi: "Menyelenggarakan pelatihan berkualitas sesuai standar Kemnaker, BNSP, dan LPJK, didukung instruktur profesional dan pendampingan penuh hingga peserta tersertifikasi.",
-  adminEmail: "admin@takaorbit.com",
-  adminPassword: "admin123",
+  /* adminEmail and adminPassword removed — auth handled by Supabase Auth */
   statAlumni: "1.200+", statBatch: "60+", statLulus: "98%", statResmi: "100%",
 };
 
@@ -260,8 +259,24 @@ function getPartners() { return store.get("toc_partners", DEFAULT_PARTNERS); }
 function savePartners(p) { return store.set("toc_partners", p); }
 function getEvents() { return store.get("toc_events", DEFAULT_EVENTS); }
 function saveEvents(e) { return store.set("toc_events", e); }
-function isAuthed() { return store.get("toc_session", false) === true; }
-function setAuthed(v) { store.set("toc_session", v); }
+/* Auth state — backed by Supabase Auth */
+let _authUser = null;
+function isAuthed() { return _authUser !== null; }
+function setAuthed(v) { if (!v) { supa.auth.signOut(); _authUser = null; } }
+
+/* Listen to auth state changes globally */
+supa.auth.onAuthStateChange((event, session) => {
+  _authUser = session ? session.user : null;
+  /* Re-render if already on admin or login page */
+  const path = parseHash ? parseHash() : "";
+  if (path.startsWith("/admin") || path === "/login") render();
+});
+
+/* Get current session on boot */
+async function initAuth() {
+  const { data } = await supa.auth.getSession();
+  _authUser = data.session ? data.session.user : null;
+}
 
 /* Generic editable collections (used by the admin CRUD engine) */
 const COLLECTIONS = {
@@ -1223,7 +1238,7 @@ function viewLogin() {
       </div>
       <div class="border-t border-outline-variant mt-8 pt-5 text-center"><p class="label-up text-[11px] text-on-surface-variant mb-1">Terakreditasi Resmi Oleh</p><p class="text-sm font-semibold text-navy">Kemnaker RI &nbsp;·&nbsp; BNSP &nbsp;·&nbsp; LPJK</p></div>
       <p class="text-xs text-on-surface-variant text-center mt-5">Khusus personel berwenang. Akses Anda dipantau & dicatat untuk kepatuhan keamanan.</p>
-      <p class="text-[11px] text-center text-on-surface-variant mt-3 bg-surface-low rounded px-3 py-2">Demo login → <b>${esc(s.adminEmail)}</b> / <b>${esc(s.adminPassword)}</b></p>
+
     </div>
   </main>`;
 }
@@ -1611,8 +1626,13 @@ function viewAdminSettings() {
 
     <div class="bg-white rounded-lg border border-outline-variant p-6">
       <h2 class="font-display font-bold text-navy text-lg mb-4 flex items-center gap-2">${icon('admin_panel_settings','text-primary')} Akun Admin</h2>
-      <div class="grid md:grid-cols-2 gap-4">${field('s-adminEmail','Email Login',s.adminEmail)}${field('s-adminPassword','Password Login',s.adminPassword)}</div>
-      <p class="text-xs text-on-surface-variant mt-3">${icon('info','text-[16px]')} Untuk situs publik, ganti password default demi keamanan.</p>
+      <div class="flex items-start gap-3 bg-surface-low rounded-lg p-4">
+        <span class="material-symbols-outlined text-primary mt-0.5">verified_user</span>
+        <div class="text-sm text-on-surface-variant">
+          <p class="font-semibold text-navy mb-1">Login dikelola oleh Supabase Auth</p>
+          <p>Untuk mengubah email atau password admin, buka <a href="https://supabase.com/dashboard/project/xhuyjcwpgboqjvvktwbe/auth/users" target="_blank" class="text-primary font-semibold underline">Supabase Dashboard → Authentication → Users</a>.</p>
+        </div>
+      </div>
     </div>
 
     <div class="flex items-center justify-between sticky bottom-0 bg-surface py-3">
@@ -1685,19 +1705,28 @@ function bindEvents(path) {
 
   const lgSubmit = $("#lg-submit");
   if (lgSubmit) {
-    const doLogin = () => {
-      const s = getSettings();
-      const email = $("#lg-email").value.trim() || $("#lg-email").placeholder;
+    const doLogin = async () => {
+      const email = $("#lg-email").value.trim();
       const pass = $("#lg-pass").value.trim();
-      if (email===s.adminEmail && pass===s.adminPassword) { setAuthed(true); location.hash="#/admin"; }
-      else $("#lg-err").classList.remove("hidden");
+      if (!email || !pass) { $("#lg-err").classList.remove("hidden"); return; }
+      lgSubmit.disabled = true;
+      lgSubmit.innerHTML = "<span class='material-symbols-outlined animate-spin'>progress_activity</span> Memproses...";
+      const { error } = await supa.auth.signInWithPassword({ email, password: pass });
+      lgSubmit.disabled = false;
+      lgSubmit.innerHTML = "<span class='material-symbols-outlined'>shield</span> Login Admin";
+      if (error) {
+        $("#lg-err").classList.remove("hidden");
+        $("#lg-err").innerHTML = "<span class='material-symbols-outlined text-[18px]'>error</span> Email atau password salah.";
+      } else {
+        location.hash = "#/admin";
+      }
     };
     lgSubmit.onclick = doLogin;
     $("#lg-pass").onkeydown = e => { if (e.key==="Enter") doLogin(); };
     $("#lg-toggle").onclick = () => { const i=$("#lg-pass"); i.type = i.type==="password"?"text":"password"; };
   }
 
-  const logout = $("#logout"); if (logout) logout.onclick = () => { setAuthed(false); location.hash="#/"; };
+  const logout = $("#logout"); if (logout) logout.onclick = async () => { await supa.auth.signOut(); _authUser = null; location.hash="#/"; };
 
   // inline edit buttons (shown on public pages when admin is logged in)
   $$("[data-pedit]").forEach(b => b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); location.hash = "#/admin/posting?edit=" + b.dataset.pedit; });
@@ -1841,7 +1870,7 @@ function bindPartnersAdmin() {
 function bindSettings() {
   $("#save-settings").onclick = () => {
     const s = getSettings();
-    ["siteName","tagline","heroTitle","heroSubtitle","heroBadge","heroCta1","heroCta2","progEyebrow","progTitle","navAbout","navCert","navInfo","navPartner","navEvents","navAllPrograms","navJabatan","ctaTitle","ctaText","footerText","accreditation","aboutText","visi","misi","waNumber","phone","email","address","statAlumni","statBatch","statLulus","statResmi","adminEmail","adminPassword"]
+    ["siteName","tagline","heroTitle","heroSubtitle","heroBadge","heroCta1","heroCta2","progEyebrow","progTitle","navAbout","navCert","navInfo","navPartner","navEvents","navAllPrograms","navJabatan","ctaTitle","ctaText","footerText","accreditation","aboutText","visi","misi","waNumber","phone","email","address","statAlumni","statBatch","statLulus","statResmi"]
       .forEach(k => { const el = $("#s-"+k); if (el) s[k]=el.value; });
     saveSettings(s);
     const msg = $("#settings-msg"); msg.classList.remove("hidden"); setTimeout(()=>msg.classList.add("hidden"),2500);
@@ -1884,7 +1913,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         <p style="font-family:Montserrat,sans-serif;font-weight:700;color:#006b3f;font-size:1.1rem;">Memuat data...</p>
       </div>
     </div>`;
-  await initDB();
+  await Promise.all([initAuth(), initDB()]);
   render();
 });
 </script>
