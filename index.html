@@ -263,22 +263,20 @@ function saveEvents(e) { return store.set("toc_events", e); }
 /* Auth state — backed by Supabase Auth */
 let _authUser = null;
 function isAuthed() { return _authUser !== null; }
-function setAuthed(v) { if (!v) { supa.auth.signOut(); _authUser = null; } }
+function setAuthed(v) { if (!v) { if (supa) supa.auth.signOut(); _authUser = null; } }
 
-/* Listen to auth state changes globally */
-supa.auth.onAuthStateChange((event, session) => {
-  _authUser = session ? session.user : null;
-  /* Re-render if already on admin or login page */
-  const path = parseHash ? parseHash() : "";
-  if (path.startsWith("/admin") || path === "/login") render();
-});
-
-/* Get current session on boot */
+/* Get current session on boot — also registers auth state listener */
 async function initAuth() {
   if (!supa) return;
   try {
     const { data } = await supa.auth.getSession();
     _authUser = data.session ? data.session.user : null;
+    /* Listen to auth state changes */
+    supa.auth.onAuthStateChange((event, session) => {
+      _authUser = session ? session.user : null;
+      const path = parseHash ? parseHash() : "";
+      if (path.startsWith("/admin") || path === "/login") render();
+    });
   } catch(e) { console.warn("initAuth failed:", e); }
 }
 
