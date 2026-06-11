@@ -130,8 +130,11 @@ const store = {
       _cache[dbKey] = v;
       /* fire-and-forget upsert */
       supa.from("site_data").upsert({ key: dbKey, value: v, updated_at: new Date().toISOString() })
-        .then(({error}) => { if (error) console.error("Supabase save error:", error); });
+        .then(({error}) => { if (error) console.error("Supabase save error [" + dbKey + "]:", error); });
       return true;
+    }
+    if (dbKey && !_dbReady) {
+      console.warn("store.set: Supabase not ready, falling back to localStorage for key:", k);
     }
     try { localStorage.setItem(k, JSON.stringify(v)); return true; }
     catch (e) { this._mem[k] = v; return false; }
@@ -1870,11 +1873,29 @@ function bindPartnersAdmin() {
 }
 
 function bindSettings() {
-  $("#save-settings").onclick = () => {
+  $("#save-settings").onclick = async () => {
+    const btn = $("#save-settings");
+    btn.disabled = true;
+    btn.innerHTML = "<span class='material-symbols-outlined animate-spin'>progress_activity</span> Menyimpan...";
     const s = getSettings();
     ["siteName","tagline","heroTitle","heroSubtitle","heroBadge","heroCta1","heroCta2","progEyebrow","progTitle","navAbout","navCert","navInfo","navPartner","navEvents","navAllPrograms","navJabatan","ctaTitle","ctaText","footerText","accreditation","aboutText","visi","misi","waNumber","phone","email","address","statAlumni","statBatch","statLulus","statResmi"]
       .forEach(k => { const el = $("#s-"+k); if (el) s[k]=el.value; });
-    saveSettings(s);
+
+    /* If Supabase is ready, await the upsert so we can catch errors */
+    if (_dbReady && supa) {
+      _cache["settings"] = s;
+      const { error } = await supa.from("site_data").upsert({ key: "settings", value: s, updated_at: new Date().toISOString() });
+      btn.disabled = false;
+      btn.innerHTML = "<span class='material-symbols-outlined'>save</span> Simpan Pengaturan";
+      if (error) {
+        alert("Gagal menyimpan ke Supabase: " + error.message);
+        return;
+      }
+    } else {
+      saveSettings(s);
+      btn.disabled = false;
+      btn.innerHTML = "<span class='material-symbols-outlined'>save</span> Simpan Pengaturan";
+    }
     const msg = $("#settings-msg"); msg.classList.remove("hidden"); setTimeout(()=>msg.classList.add("hidden"),2500);
   };
   const lf = $("#logo-file");
