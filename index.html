@@ -12,6 +12,7 @@
 <meta property="og:description" content="Sertifikasi resmi Ahli K3 Umum Kemnaker, BNSP, dan SKK Konstruksi."/>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24 3 L41 11 V25 C41 35 33 42 24 45 C15 42 7 35 7 25 V11 Z' fill='%23006b3f'/%3E%3Cpath d='M16 17 H32 M24 17 V33' stroke='%23fff' stroke-width='3.2' stroke-linecap='round'/%3E%3Ccircle cx='24' cy='22' r='3' fill='%23fcd400'/%3E%3C/svg%3E"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet"/>
 <script>
@@ -82,16 +83,57 @@
    Features: logo upload · post images · gallery (foto/flyer)
    ========================================================= */
 
-/* ---------- Resilient storage ---------- */
+/* ---------- Supabase ---------- */
+const SUPA_URL = "https://xhuyjcwpgboqjvvktwbe.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhodXlqY3dwZ2JvcWp2dmt0d2JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNDc2ODUsImV4cCI6MjA5NjcyMzY4NX0.7QG-BUmd_77qOKjmGx65_UIOhMr34tx-XMZ9sZILKVk";
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+/* In-memory cache so reads are instant after first load */
+const _cache = {};
+let _dbReady = false;
+
+/* Load ALL keys from Supabase into cache on boot */
+async function initDB() {
+  try {
+    const { data, error } = await supa.from("site_data").select("key,value");
+    if (error) throw error;
+    data.forEach(row => { if (row.value !== null) _cache[row.key] = row.value; });
+    _dbReady = true;
+  } catch(e) {
+    console.warn("Supabase init failed, using localStorage fallback", e);
+    _dbReady = false;
+  }
+}
+
+/* Map toc_* keys to DB keys */
+const KEY_MAP = {
+  toc_settings:"settings", toc_posts:"posts", toc_gallery:"gallery",
+  toc_programs:"programs", toc_features:"features", toc_steps:"steps",
+  toc_testimonials:"testimonials", toc_partners:"partners",
+  toc_events:"events", toc_skk:"skk"
+};
+
 const store = {
   _mem: {},
   get(k, def) {
+    const dbKey = KEY_MAP[k];
+    if (dbKey && _dbReady) {
+      return (dbKey in _cache) ? _cache[dbKey] : def;
+    }
     try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); }
     catch (e) { return (k in this._mem) ? this._mem[k] : def; }
   },
   set(k, v) {
+    const dbKey = KEY_MAP[k];
+    if (dbKey && _dbReady) {
+      _cache[dbKey] = v;
+      /* fire-and-forget upsert */
+      supa.from("site_data").upsert({ key: dbKey, value: v, updated_at: new Date().toISOString() })
+        .then(({error}) => { if (error) console.error("Supabase save error:", error); });
+      return true;
+    }
     try { localStorage.setItem(k, JSON.stringify(v)); return true; }
-    catch (e) { this._mem[k] = v; return false; } // quota / blocked -> memory fallback
+    catch (e) { this._mem[k] = v; return false; }
   },
 };
 
@@ -1828,8 +1870,23 @@ function bindSettings() {
 
 /* ---------- boot ---------- */
 window.addEventListener("hashchange", render);
-window.addEventListener("DOMContentLoaded", render);
-render();
+window.addEventListener("DOMContentLoaded", async () => {
+  // Show loading overlay while Supabase data loads
+  document.getElementById("app").innerHTML = `
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f5fbf3;">
+      <div style="text-align:center;">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin:0 auto 16px;display:block">
+          <path d="M24 3 L41 11 V25 C41 35 33 42 24 45 C15 42 7 35 7 25 V11 Z" fill="#006b3f" opacity="0.15"/>
+          <path d="M24 3 L41 11 V25 C41 35 33 42 24 45 C15 42 7 35 7 25 V11 Z" stroke="#006b3f" stroke-width="2.5"/>
+          <path d="M16 17 H32 M24 17 V33" stroke="#006b3f" stroke-width="3.2" stroke-linecap="round"/>
+          <circle cx="24" cy="22" r="3" fill="#fcd400"/>
+        </svg>
+        <p style="font-family:Montserrat,sans-serif;font-weight:700;color:#006b3f;font-size:1.1rem;">Memuat data...</p>
+      </div>
+    </div>`;
+  await initDB();
+  render();
+});
 </script>
 </body>
 </html>
