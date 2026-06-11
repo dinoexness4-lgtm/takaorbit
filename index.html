@@ -170,6 +170,7 @@ const DEFAULT_SETTINGS = {
   misi: "Menyelenggarakan pelatihan berkualitas sesuai standar Kemnaker, BNSP, dan LPJK, didukung instruktur profesional dan pendampingan penuh hingga peserta tersertifikasi.",
   /* adminEmail and adminPassword removed — auth handled by Supabase Auth */
   statAlumni: "1.200+", statBatch: "60+", statLulus: "98%", statResmi: "100%",
+  heroMediaType: "", heroMediaUrl: "",  /* "image" | "video" | "" */
 };
 
 const DEFAULT_PROGRAMS = [
@@ -413,7 +414,6 @@ function publicHeader(active) {
         <a href="#/jadwal" class="nav-link ${active==='jadwal'?'active':''} text-sm font-semibold text-navy hover:text-primary transition-colors">${esc(s.navEvents)}</a>
       </nav>
       <div class="flex items-center gap-2">
-        <a href="#/login" class="hidden md:inline-flex items-center gap-1.5 text-sm font-semibold text-navy border border-navy/30 rounded px-4 py-2 hover:bg-navy hover:text-white transition-colors">${icon('lock','text-[18px]')} Login</a>
         <a href="https://wa.me/${waLink(s.waNumber)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-sm font-bold bg-secondary text-navy rounded px-4 py-2 hover:brightness-95 transition">Daftar</a>
         <button id="mnav" aria-label="Menu" class="md:hidden text-navy p-2">${icon('menu')}</button>
       </div>
@@ -426,7 +426,7 @@ function publicHeader(active) {
       <details class="m-acc"><summary class="flex items-center justify-between py-2 font-semibold text-navy">${esc(s.navInfo)} ${icon('expand_more','text-[18px]')}</summary><div class="pl-3 pb-1 space-y-1"><a href="#/posting" class="block py-1.5 text-sm text-on-surface-variant">Posting Terbaru</a><a href="#/galeri" class="block py-1.5 text-sm text-on-surface-variant">Galeri Kegiatan</a></div></details>
       <details class="m-acc"><summary class="flex items-center justify-between py-2 font-semibold text-navy">${esc(s.navPartner)} ${icon('expand_more','text-[18px]')}</summary><div class="pl-3 pb-1 space-y-1"><a href="#/mitra" class="block py-1.5 text-sm text-on-surface-variant">Mitra & Klien</a><a href="#/#kontak" class="block py-1.5 text-sm text-on-surface-variant">Hubungi Kami</a></div></details>
       <a href="#/jadwal" class="block py-2 font-semibold text-navy">${esc(s.navEvents)}</a>
-      <a href="#/login" class="block py-2 font-semibold text-primary">Login Admin</a>
+
     </div>
   </header>`;
 }
@@ -453,7 +453,7 @@ function publicFooter() {
           <li><a href="#/posting" class="hover:text-white">Posting Terbaru</a></li>
           <li><a href="#/galeri" class="hover:text-white">Galeri Kegiatan</a></li>
           <li><a href="#/mitra" class="hover:text-white">Mitra & Klien</a></li>
-          <li><a href="#/login" class="hover:text-white">Login Admin</a></li>
+
         </ul></div>
       <div><h4 class="label-up text-xs text-secondary mb-3">Kontak</h4>
         <ul class="space-y-2 text-sm text-white/70">
@@ -514,16 +514,44 @@ function viewHome() {
   const posts = getPosts().slice(0,3);
   const gallery = getGallery().slice(0,6);
 
+  /* hero media block: image or video or empty */
+  const heroMediaBlock = (() => {
+    if (s.heroMediaType === "video" && s.heroMediaUrl) {
+      // detect youtube / vimeo embed or direct video
+      let embed = "";
+      const ytMatch = s.heroMediaUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+      const viMatch = s.heroMediaUrl.match(/vimeo\.com\/(\d+)/);
+      if (ytMatch) embed = `<iframe src="https://www.youtube.com/embed/${ytMatch[1]}?autoplay=0&rel=0" class="absolute inset-0 w-full h-full rounded-xl" frameborder="0" allowfullscreen></iframe>`;
+      else if (viMatch) embed = `<iframe src="https://player.vimeo.com/video/${viMatch[1]}" class="absolute inset-0 w-full h-full rounded-xl" frameborder="0" allowfullscreen></iframe>`;
+      else embed = `<video src="${esc(s.heroMediaUrl)}" controls class="absolute inset-0 w-full h-full rounded-xl object-cover"></video>`;
+      return `<div class="relative aspect-video rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/20">${embed}</div>`;
+    }
+    if (s.heroMediaType === "image" && s.heroMediaUrl) {
+      return `<div class="rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/20"><img src="${esc(s.heroMediaUrl)}" alt="" class="w-full h-auto block object-contain"/></div>`;
+    }
+    return "";
+  })();
+
+  const heroLayout = heroMediaBlock
+    ? `<div class="grid md:grid-cols-2 gap-10 md:gap-14 items-center">`
+    : `<div class="max-w-3xl">`;
+  const heroClose = heroMediaBlock ? `</div>` : `</div>`;
+
   const hero = `
   <section class="hero-mesh text-white">
     <div class="max-w-content mx-auto px-4 md:px-8 py-20 md:py-28">
-      <span class="inline-flex items-center gap-2 bg-secondary text-navy text-xs font-bold label-up px-3 py-1.5 rounded mb-6">${icon('verified','text-[16px]')} ${esc(s.heroBadge)}</span>
-      <h1 class="font-display font-extrabold text-4xl md:text-6xl leading-[1.05] max-w-3xl mb-5">${esc(s.heroTitle)}</h1>
-      <p class="text-white/75 text-lg max-w-2xl mb-8">${esc(s.heroSubtitle)}</p>
-      <div class="flex flex-wrap gap-3">
-        <a href="#/program" class="inline-flex items-center gap-2 bg-secondary text-navy font-bold px-6 py-3.5 rounded hover:brightness-95 transition">${esc(s.heroCta1)} ${icon('arrow_forward','text-[20px]')}</a>
-        <a href="https://wa.me/${waLink(s.waNumber)}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 border border-white/40 text-white font-semibold px-6 py-3.5 rounded hover:bg-white/10 transition">${waGlyph('text-[20px]')} ${esc(s.heroCta2)}</a>
+      ${heroLayout}
+      <div>
+        <span class="inline-flex items-center gap-2 bg-secondary text-navy text-xs font-bold label-up px-3 py-1.5 rounded mb-6">${icon('verified','text-[16px]')} ${esc(s.heroBadge)}</span>
+        <h1 class="font-display font-extrabold text-4xl md:text-6xl leading-[1.05] mb-5">${esc(s.heroTitle)}</h1>
+        <p class="text-white/75 text-lg mb-8">${esc(s.heroSubtitle)}</p>
+        <div class="flex flex-wrap gap-3">
+          <a href="#/program" class="inline-flex items-center gap-2 bg-secondary text-navy font-bold px-6 py-3.5 rounded hover:brightness-95 transition">${esc(s.heroCta1)} ${icon('arrow_forward','text-[20px]')}</a>
+          <a href="https://wa.me/${waLink(s.waNumber)}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 border border-white/40 text-white font-semibold px-6 py-3.5 rounded hover:bg-white/10 transition">${waGlyph('text-[20px]')} ${esc(s.heroCta2)}</a>
+        </div>
       </div>
+      ${heroMediaBlock ? `<div>${heroMediaBlock}</div>` : ""}
+      ${heroClose}
     </div>
   </section>`;
 
@@ -666,17 +694,19 @@ function galleryCard(g) {
   const ic = g.type === "Flyer" ? "campaign" : "photo_camera";
   const s = getSettings();
   const waHref = `https://wa.me/${waLink(s.waNumber)}?text=${encodeURIComponent("Halo Taka Orbit, saya tertarik dengan informasi di galeri: " + g.caption)}`;
-  /* Flyer: fit contain (no crop); Kegiatan: cover */
-  const imgFit = g.type === "Flyer" ? "object-contain bg-white" : "object-cover group-hover:scale-105 transition duration-300";
   return `
-  <div class="group relative rounded-lg overflow-hidden border border-outline-variant bg-white ${g.image?'cursor-pointer':''}" ${g.image?`data-lb="${g.image}" data-cap="${esc(g.caption)}"`:''}>
+  <div class="group relative rounded-lg overflow-hidden border border-outline-variant bg-white flex flex-col">
     ${isAuthed()?`<button data-gedit="${g.id}" title="Kelola galeri" class="absolute top-2 right-2 z-20 inline-flex items-center justify-center w-9 h-9 rounded-full bg-navy-deep/90 text-white hover:bg-primary transition">${icon('edit','text-[18px]')}</button>`:''}
-    <div class="relative aspect-[4/3] ${g.image?'':'ph-img'}">
-      ${g.image ? `<img src="${g.image}" loading="lazy" alt="${esc(g.caption)}" class="absolute inset-0 w-full h-full ${imgFit}"/>`
-                : `<div class="absolute inset-0 flex items-center justify-center text-white/50">${icon(ic,'text-[40px]')}</div>`}
+    <div class="relative overflow-hidden ${g.image?'cursor-pointer':('ph-img aspect-[4/3]')}" ${g.image?`data-lb="${g.image}" data-cap="${esc(g.caption)}"`:''}>
+      ${g.image
+        ? `<img src="${g.image}" loading="lazy" alt="${esc(g.caption)}" class="w-full h-auto block"/>
+           <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center pointer-events-none">
+             <span class="opacity-0 group-hover:opacity-100 transition bg-white/90 rounded-full p-2">${icon('zoom_in','text-[22px] text-navy')}</span>
+           </div>`
+        : `<div class="absolute inset-0 flex items-center justify-center text-white/50">${icon(ic,'text-[40px]')}</div>`}
       <span class="absolute top-2 left-2 z-10 ${badge} text-[10px] font-bold label-up px-2 py-1 rounded">${esc(g.type)}</span>
     </div>
-    <div class="p-3 flex items-start justify-between gap-2">
+    <div class="p-3 flex items-start justify-between gap-2 mt-auto">
       <p class="text-sm font-semibold text-navy leading-snug flex-1">${esc(g.caption)}</p>
       <a href="${waHref}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Tanya via WhatsApp"
          class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#25D366] text-white hover:brightness-95 transition">
@@ -737,12 +767,13 @@ function viewGallery() {
     ${items.length ? `<div class="grid grid-cols-2 md:grid-cols-4 gap-4">${items.map(g=>galleryCard(g)).join("")}</div>`
       : `<div class="text-center py-20 text-on-surface-variant"><div class="mb-3">${icon('photo_library','text-[48px]')}</div><p>Belum ada dokumentasi. Tambahkan dari panel admin.</p></div>`}
   </section>
-  <div id="lightbox" class="hidden fixed inset-0 z-[60] bg-navy-deep/90 flex items-center justify-center p-4" >
-    <button id="lb-close" class="absolute top-4 right-4 text-white">${icon('close','text-[32px]')}</button>
-    <figure class="max-w-4xl w-full text-center">
-      <img id="lb-img" src="" alt="" class="max-h-[80vh] w-auto mx-auto rounded-lg"/>
-      <figcaption id="lb-cap" class="text-white/80 mt-3 text-sm"></figcaption>
+  <div id="lightbox" class="hidden fixed inset-0 z-[60] bg-navy-deep/95 flex flex-col items-center justify-center p-4" style="backdrop-filter:blur(4px)">
+    <button id="lb-close" class="absolute top-4 right-4 z-10 inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/25 text-white transition">${icon('close','text-[24px]')}</button>
+    <figure class="max-w-5xl w-full text-center flex flex-col items-center">
+      <img id="lb-img" src="" alt="" class="max-h-[82vh] max-w-full w-auto mx-auto rounded-lg shadow-2xl object-contain"/>
+      <figcaption id="lb-cap" class="text-white/80 mt-4 text-sm font-semibold"></figcaption>
     </figure>
+    <p class="absolute bottom-4 text-white/40 text-xs">Klik di luar gambar atau tekan ESC untuk menutup</p>
   </div>`;
   return shell("galeri", inner);
 }
@@ -1459,7 +1490,7 @@ function bindCrud(ck, deepLink) {
 function viewAdminProgram() {
   const s = getSettings();
   const inner = `
-  <p class="text-sm text-on-surface-variant mb-5">Kelola isi menu <strong>Sertifikasi</strong>. Daftar di bawah inilah yang muncul pada dropdown "Sertifikasi" di navigasi situs dan di halaman Sertifikasi. Tiga teratas juga tampil di Beranda.</p>
+  <div class="flex items-start gap-3 bg-surface-low rounded-lg p-4 border border-outline-variant mb-5 text-sm text-on-surface-variant"><span class="material-symbols-outlined text-primary mt-0.5 shrink-0">info</span><div>Kelola isi menu <strong>Sertifikasi</strong>. Urutan di tabel ini menentukan urutan di <strong>dropdown navigasi</strong> situs dan di halaman Sertifikasi. Tiga teratas juga tampil di <strong>Beranda</strong>. Gunakan tombol <span class="inline-flex items-center gap-0.5 font-bold text-navy">↑ ↓</span> untuk menyusun ulang urutan.</div></div>
 
   <div class="bg-white rounded-lg border border-outline-variant p-5 md:p-6 mb-6">
     <h2 class="font-display font-bold text-navy mb-1">Judul Halaman Sertifikasi</h2>
@@ -1472,7 +1503,19 @@ function viewAdminProgram() {
   </div>
 
   <h2 class="font-display font-bold text-navy mb-3">Daftar Sertifikasi</h2>
-  ${crudTable("programs")}`;
+  ${crudTable("programs")}
+
+  <div class="bg-white rounded-lg border border-outline-variant p-5 mt-6">
+    <h3 class="font-display font-semibold text-navy mb-2 flex items-center gap-2">${icon('preview','text-primary text-[18px]')} Preview Dropdown Navigasi</h3>
+    <p class="text-xs text-on-surface-variant mb-3">Ini tampilan dropdown "Sertifikasi" di navbar situs berdasarkan urutan saat ini:</p>
+    <div class="bg-surface-low rounded p-3 inline-block min-w-[220px]">
+      ${getPrograms().map(p=>`<div class="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-navy"><span class="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>${esc(p.name)}</div>`).join("")}
+      <div class="border-t border-outline-variant mt-1 pt-1">
+        <div class="px-3 py-1.5 text-sm font-semibold text-primary">Semua Program →</div>
+        <div class="px-3 py-1.5 text-sm font-semibold text-navy/60">Daftar Jabatan Kerja SKK</div>
+      </div>
+    </div>
+  </div>`;
   return adminShell("programs", inner);
 }
 
@@ -1623,6 +1666,35 @@ function viewAdminSettings() {
         ${field('s-progEyebrow','Label Program (Beranda)',s.progEyebrow)}
         ${field('s-progTitle','Judul Program (Beranda)',s.progTitle)}
         ${field('s-ctaTitle','Judul Ajakan (CTA)',s.ctaTitle)}
+      </div>
+
+      <div class="mt-4 bg-surface-low rounded-lg p-4 border border-outline-variant">
+        <div class="flex items-center gap-2 mb-3">${icon('perm_media','text-primary text-[20px]')}<h3 class="font-display font-semibold text-navy">Media Hero (Opsional)</h3></div>
+        <p class="text-xs text-on-surface-variant mb-3">Upload foto atau video untuk ditampilkan di sisi kanan teks hero beranda. Kosongkan untuk tampilan teks penuh (tanpa media).</p>
+        <div class="grid md:grid-cols-2 gap-4 mb-3">
+          <div>
+            <label class="label-up text-xs text-on-surface-variant block mb-1.5">Tipe Media</label>
+            <select id="s-heroMediaType" class="w-full border border-outline rounded px-3 py-2.5">
+              <option value="" ${!s.heroMediaType?'selected':''}>Tidak ada</option>
+              <option value="image" ${s.heroMediaType==='image'?'selected':''}>Foto / Gambar</option>
+              <option value="video" ${s.heroMediaType==='video'?'selected':''}>Video (URL / YouTube)</option>
+            </select>
+          </div>
+          <div id="hero-video-url-wrap" class="${s.heroMediaType==='video'?'':'hidden'}">
+            <label class="label-up text-xs text-on-surface-variant block mb-1.5">URL Video (YouTube / Vimeo / MP4)</label>
+            <input id="s-heroVideoUrl" class="w-full border border-outline rounded px-3 py-2.5" placeholder="https://youtube.com/watch?v=..." value="${esc(s.heroMediaType==='video'?s.heroMediaUrl:'')}">
+          </div>
+        </div>
+        <div id="hero-img-wrap" class="${s.heroMediaType==='image'?'':'hidden'}">
+          <label class="label-up text-xs text-on-surface-variant block mb-1.5">Upload Foto Hero</label>
+          <div class="flex items-start gap-4">
+            <div id="hero-img-prev" class="rounded-lg overflow-hidden bg-white border border-outline-variant flex-shrink-0 w-40">${s.heroMediaType==='image'&&s.heroMediaUrl?`<img src="${esc(s.heroMediaUrl)}" class="w-full h-auto block" alt="">`:''}</div>
+            <div class="flex-1 space-y-2">
+              <input id="hero-img-file" type="file" accept="image/*" class="block w-full text-sm text-on-surface-variant file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-primary file:text-white file:font-semibold">
+              <button type="button" id="hero-img-clear" class="text-xs text-error hover:underline">Hapus foto hero</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="mt-4"><label class="label-up text-xs text-on-surface-variant block mb-1">Teks Ajakan (CTA)</label><textarea id="s-ctaText" rows="2" class="w-full border border-outline rounded px-3 py-2.5">${esc(s.ctaText)}</textarea></div>
       <div class="mt-4"><label class="label-up text-xs text-on-surface-variant block mb-1">Teks Footer</label><textarea id="s-footerText" rows="2" class="w-full border border-outline rounded px-3 py-2.5">${esc(s.footerText)}</textarea></div>
@@ -1775,14 +1847,32 @@ function bindEvents(path) {
 
 function bindLightbox() {
   const lb = $("#lightbox");
-  $$("[data-lb]").forEach(el => el.onclick = () => {
-    $("#lb-img").src = el.getAttribute("data-lb");
+  const items = $$("[data-lb]");
+  let current = 0;
+
+  const open = (idx) => {
+    current = idx;
+    const el = items[idx];
+    const img = $("#lb-img");
+    img.src = "";
+    img.src = el.getAttribute("data-lb");
     $("#lb-cap").textContent = el.getAttribute("data-cap") || "";
     lb.classList.remove("hidden");
-  });
-  const close = () => lb.classList.add("hidden");
+    document.body.style.overflow = "hidden";
+  };
+
+  const close = () => {
+    lb.classList.add("hidden");
+    document.body.style.overflow = "";
+  };
+
+  items.forEach((el, idx) => el.onclick = () => open(idx));
   $("#lb-close").onclick = close;
-  lb.onclick = e => { if (e.target===lb) close(); };
+  lb.onclick = e => { if (e.target === lb || e.target.closest("figure") === null) close(); };
+  document.addEventListener("keydown", function lbKey(e) {
+    if (lb.classList.contains("hidden")) return;
+    if (e.key === "Escape") close();
+  });
 }
 
 function bindPostAdmin() {
@@ -1888,7 +1978,7 @@ function bindSettings() {
     btn.disabled = true;
     btn.innerHTML = "<span class='material-symbols-outlined animate-spin'>progress_activity</span> Menyimpan...";
     const s = getSettings();
-    ["siteName","tagline","heroTitle","heroSubtitle","heroBadge","heroCta1","heroCta2","progEyebrow","progTitle","navAbout","navCert","navInfo","navPartner","navEvents","navAllPrograms","navJabatan","ctaTitle","ctaText","footerText","accreditation","aboutText","visi","misi","waNumber","phone","email","address","statAlumni","statBatch","statLulus","statResmi"]
+    ["siteName","tagline","heroTitle","heroSubtitle","heroBadge","heroCta1","heroCta2","progEyebrow","progTitle","navAbout","navCert","navInfo","navPartner","navEvents","navAllPrograms","navJabatan","ctaTitle","ctaText","footerText","accreditation","aboutText","visi","misi","waNumber","phone","email","address","statAlumni","statBatch","statLulus","statResmi","heroMediaType"]
       .forEach(k => { const el = $("#s-"+k); if (el) s[k]=el.value; });
 
     /* If Supabase is ready, await the upsert so we can catch errors */
@@ -1906,6 +1996,25 @@ function bindSettings() {
       btn.disabled = false;
       btn.innerHTML = "<span class='material-symbols-outlined'>save</span> Simpan Pengaturan";
     }
+    /* Handle hero media separately (not a simple text input) */
+    const hmTypeEl = $("#s-heroMediaType");
+    if (hmTypeEl) {
+      s.heroMediaType = hmTypeEl.value;
+      if (hmTypeEl.value === "video") {
+        s.heroMediaUrl = ($("#s-heroVideoUrl") || {}).value || "";
+      } else if (hmTypeEl.value === "image") {
+        const hf = $("#hero-img-file");
+        if (hf && hf.dataset.dataUrl) s.heroMediaUrl = hf.dataset.dataUrl;
+        else if (!hf || !hf.dataset.dataUrl) {
+          /* keep existing if no new upload */
+          const existing = getSettings().heroMediaType === "image" ? getSettings().heroMediaUrl : "";
+          if (!s.heroMediaUrl) s.heroMediaUrl = existing;
+        }
+      } else {
+        s.heroMediaUrl = "";
+      }
+    }
+
     const msg = $("#settings-msg"); msg.classList.remove("hidden"); setTimeout(()=>msg.classList.add("hidden"),2500);
   };
   const lf = $("#logo-file");
@@ -1921,6 +2030,34 @@ function bindSettings() {
   };
   const lc = $("#logo-clear");
   if (lc) lc.onclick = () => { const s = getSettings(); s.logo=""; saveSettings(s); render(); };
+
+  /* Hero media type toggle */
+  const hmType = $("#s-heroMediaType");
+  if (hmType) {
+    const toggleHeroWrap = () => {
+      const v = hmType.value;
+      const imgWrap = $("#hero-img-wrap"); const vidWrap = $("#hero-video-url-wrap");
+      if (imgWrap) imgWrap.classList.toggle("hidden", v !== "image");
+      if (vidWrap) vidWrap.classList.toggle("hidden", v !== "video");
+    };
+    hmType.onchange = toggleHeroWrap;
+    /* Image upload for hero */
+    const heroFile = $("#hero-img-file");
+    if (heroFile) heroFile.onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try {
+        const d = await fileToData(f, 1600, 0.82);
+        const prev = $("#hero-img-prev"); if (prev) prev.innerHTML = `<img src="${d}" class="w-full h-auto block" alt="">`;
+        /* store temporarily on element for save handler */
+        heroFile.dataset.dataUrl = d;
+      } catch { alert("Gagal memproses gambar hero."); }
+    };
+    const heroClear = $("#hero-img-clear");
+    if (heroClear) heroClear.onclick = () => {
+      if (heroFile) { heroFile.value = ""; heroFile.dataset.dataUrl = ""; }
+      const prev = $("#hero-img-prev"); if (prev) prev.innerHTML = "";
+    };
+  }
   $("#reset-data").onclick = () => {
     if (!confirm("Reset semua data (pengaturan, konten beranda, program, jadwal, posting, galeri, mitra) ke kondisi awal?")) return;
     saveSettings(Object.assign({}, DEFAULT_SETTINGS)); savePosts(DEFAULT_POSTS); saveGallery(DEFAULT_GALLERY);
