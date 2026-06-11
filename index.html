@@ -86,7 +86,7 @@
 /* ---------- Supabase ---------- */
 const SUPA_URL = "https://xhuyjcwpgboqjvvktwbe.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhodXlqY3dwZ2JvcWp2dmt0d2JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNDc2ODUsImV4cCI6MjA5NjcyMzY4NX0.7QG-BUmd_77qOKjmGx65_UIOhMr34tx-XMZ9sZILKVk";
-const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+let supa; /* initialized after DOM ready to ensure SDK is loaded */
 
 /* In-memory cache so reads are instant after first load */
 const _cache = {};
@@ -94,6 +94,7 @@ let _dbReady = false;
 
 /* Load ALL keys from Supabase into cache on boot */
 async function initDB() {
+  if (!supa) { console.warn("Supabase not initialized, using localStorage fallback"); return; }
   try {
     const { data, error } = await supa.from("site_data").select("key,value");
     if (error) throw error;
@@ -274,8 +275,11 @@ supa.auth.onAuthStateChange((event, session) => {
 
 /* Get current session on boot */
 async function initAuth() {
-  const { data } = await supa.auth.getSession();
-  _authUser = data.session ? data.session.user : null;
+  if (!supa) return;
+  try {
+    const { data } = await supa.auth.getSession();
+    _authUser = data.session ? data.session.user : null;
+  } catch(e) { console.warn("initAuth failed:", e); }
 }
 
 /* Generic editable collections (used by the admin CRUD engine) */
@@ -1913,6 +1917,15 @@ window.addEventListener("DOMContentLoaded", async () => {
         <p style="font-family:Montserrat,sans-serif;font-weight:700;color:#006b3f;font-size:1.1rem;">Memuat data...</p>
       </div>
     </div>`;
+
+  /* Init Supabase client here — SDK guaranteed loaded by now */
+  try {
+    supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+  } catch(e) {
+    console.error("Supabase SDK not loaded:", e);
+    supa = null;
+  }
+
   await Promise.all([initAuth(), initDB()]);
   render();
 });
